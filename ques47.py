@@ -66,13 +66,13 @@ def build_seq2seq_model(input_vocab_size, output_vocab_size, embedding_dim, hidd
     decoder_embedding = layers.Embedding(input_dim=output_vocab_size, output_dim=embedding_dim)(decoder_input)
     decoder_lstm = layers.LSTM(hidden_units, return_sequences=True, return_state=True)
     decoder_lstm_output, _, _ = decoder_lstm(decoder_embedding, initial_state=encoder_states)
-    
+
     attention = layers.Attention()([decoder_lstm_output, encoder_output])
     attention_output = layers.Concatenate(axis=-1)([decoder_lstm_output, attention])
-    
+
     decoder_dense = layers.Dense(output_vocab_size, activation='softmax')
     decoder_output = decoder_dense(attention_output)
-    
+
     model = models.Model([encoder_input, decoder_input], decoder_output)
     return model
 
@@ -80,7 +80,7 @@ def build_seq2seq_model(input_vocab_size, output_vocab_size, embedding_dim, hidd
 embedding_dim = 256
 hidden_units = 512
 batch_size = 64
-epochs = 5  # Reduced for faster testing; increase for better results
+epochs = 1  # Reduced for faster testing; increase for better results
 input_vocab_size = len(english_tokenizer.word_index) + 1
 output_vocab_size = len(spanish_tokenizer.word_index) + 1
 
@@ -119,10 +119,10 @@ decoder_model = models.Model([decoder_input, encoder_output] + decoder_states_in
 def beam_search_decode(encoder_model, decoder_model, input_seq, spanish_tokenizer, beam_width=3, max_len=MAX_OUTPUT_LENGTH):
     enc_output, state_h, state_c = encoder_model.predict(input_seq, verbose=0)
     states = [state_h, state_c]
-    
+
     sequences = [[[], 0.0, states]]  # [token_list, score, states]
     start_token = spanish_tokenizer.word_index['<START>']
-    
+
     for _ in range(max_len):
         all_candidates = []
         for seq, score, states in sequences:
@@ -139,7 +139,7 @@ def beam_search_decode(encoder_model, decoder_model, input_seq, spanish_tokenize
                 new_seq = seq + [prob]
                 all_candidates.append([new_seq, score + score_inc, new_states])
         sequences = sorted(all_candidates, key=lambda x: x[1], reverse=True)[:beam_width]
-    
+
     best_seq = sequences[0][0]
     return [spanish_tokenizer.index_word.get(idx, '<UNK>') for idx in best_seq]
 
@@ -150,10 +150,10 @@ def evaluate_bleu(model, encoder_model, decoder_model, input_data, target_senten
         input_seq = input_seq.reshape(1, -1)
         pred_tokens = beam_search_decode(encoder_model, decoder_model, input_seq, spanish_tokenizer)
         predictions.append(' '.join(pred_tokens))
-    
+
     references = [[t.split()] for t in target_sentences]
     candidates = [pred.split() for pred in predictions]
-    
+
     bleu_score = corpus_bleu(references, candidates)
     return bleu_score
 
